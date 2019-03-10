@@ -1,0 +1,376 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CloudSploit Batch
+# Architectural choices :
+# - no user, no password, no key, only roles
+# - no ssh access to compute envs
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: 'ComputeEnv network'
+        Parameters: ['ComputeEnvVPC', 'ComputeEnvSubnets']
+      - Label:
+          default: 'ComputeEnv Cpu'
+        Parameters: ['ComputeEnvMinCpu', 'ComputeEnvDesiredCpu', 'ComputeEnvMaxCpu']
+
+Parameters:
+
+  DisplayName:
+    Description: Project name
+    Type: String
+    Default: "cloudsploit"
+
+  TagBlock:
+    Description: Applicative block tag
+    Type: String
+    Default: "security"
+
+  TagApp:
+    Description: Application tag
+    Type: String
+    Default: "cloudsploit"
+
+  TagOrg:
+    Description: Organization tag
+    Type: String
+    Default: "cloudsecteam"
+
+  CloudSploitFrequency:
+    Description: define execution frequency
+    Type: String
+    Default: "cron(0 5 ? * * *)"
+
+  ComputeEnvVPC:
+    Description: compute envs VPC location
+    Type: AWS::EC2::VPC::Id
+
+  ComputeEnvSubnets:
+    Description: compute envs subnets location
+    Type: List<AWS::EC2::Subnet::Id>
+
+  ComputeEnvMinCpu:
+    Description: compute envs VPC location
+    Type: Number
+    Default: 0
+
+  ComputeEnvDesiredCpu:
+    Description: compute envs VPC location
+    Type: Number
+    Default: 0
+
+  ComputeEnvMaxCpu:
+    Description: compute envs VPC location
+    Type: Number
+    Default: 2
+
+  CloudSploitEcrImage:
+    Description: ECR image to use
+    Type: String
+
+  CloudSploitRoleToAssume:
+    Description: IAM role to assume on the child account to CloudSploit
+    Type: String
+    Default: cloudsploit-scan-assumerole
+
+  CloudSploitOrganlizationsRole:
+    Description: IAM role to assume on the Organizations account to CloudSploit
+    Type: String
+    Default: cloudsploit-organizations-assumerole
+
+
+  CloudSploitBucket:
+    Description: S3 bucket for CloudSploit assets
+    Type: String
+
+
+Resources:
+
+  CloudSploitComputeEnvSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for CloudSploit Batch instances
+      VpcId: !Ref ComputeEnvVPC
+      Tags:
+      - Key: Block
+        Value: !Ref TagBlock
+      - Key: Org
+        Value: !Ref TagOrg
+      - Key: App
+        Value: !Ref TagApp
+
+  SpotFleetRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - "spotfleet.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      ManagedPolicyArns:
+      - "arn:aws:iam::aws:policy/service-role/AmazonEC2SpotFleetRole"
+      - "arn:aws:iam::aws:policy/service-role/AmazonEC2SpotFleetTaggingRole"
+
+  CloudSploitComputeEnv:
+    Type: "AWS::Batch::ComputeEnvironment"
+    Properties:
+      Type: MANAGED
+      ServiceRole: !Ref ComputeEnvironmentRole
+      ComputeResources:
+        MinvCpus: !Ref ComputeEnvMinCpu
+        MaxvCpus: !Ref ComputeEnvMaxCpu
+        DesiredvCpus: !Ref ComputeEnvDesiredCpu
+        SecurityGroupIds:
+          - !Ref CloudSploitComputeEnvSecurityGroup
+        Subnets: !Ref ComputeEnvSubnets
+        Type: SPOT
+        BidPercentage: 50
+        SpotIamFleetRole: !Ref SpotFleetRole
+        InstanceRole: !Ref EcsInstanceProfile
+        InstanceTypes:
+          - c5
+        Tags: {Name: !Ref DisplayName, Block: !Ref TagBlock, App: !Ref TagApp, Org: !Ref TagOrg}
+      State: ENABLED
+
+  ComputeEnvironmentRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: "/"
+      RoleName: !Sub "${DisplayName}-compute-environment"
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - batch.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      ManagedPolicyArns:
+      - "arn:aws:iam::aws:policy/service-role/AWSBatchServiceRole"
+
+  CloudSploitJobQueue:
+    Type: "AWS::Batch::JobQueue"
+    Properties:
+      ComputeEnvironmentOrder:
+        - Order: 1
+          ComputeEnvironment: !Ref CloudSploitComputeEnv
+      Priority: 1
+      JobQueueName: !Sub "${DisplayName}-queue"
+
+  EcsInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: "/"
+      RoleName: !Sub "${DisplayName}-ecsinstance"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - ec2.amazonaws.com
+          Action:
+          - sts:AssumeRole
+
+  EcsInstanceProfile:
+    Type: "AWS::IAM::InstanceProfile"
+    Properties:
+      Path: "/"
+      Roles:
+      - !Ref EcsInstanceRole
+
+  CloudSploitJobDefinition:
+    Type: "AWS::Batch::JobDefinition"
+    Properties:
+      JobDefinitionName: !Sub "${DisplayName}-job-definition"
+      Type: container
+      Parameters: {}
+      ContainerProperties:
+        Memory: 1000
+        Privileged: false
+        JobRoleArn: !Ref CloudSploitJobRole
+        ReadonlyRootFilesystem: false
+        Vcpus: 1
+        Image: !Ref CloudSploitEcrImage 
+        Environment:
+          - Name: CLOUDSPLOIT_BUCKET
+            Value: !Ref CloudSploitBucket
+      RetryStrategy:
+        Attempts: 1
+
+  CloudSploitJobRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: "/"
+      RoleName: !Sub "${DisplayName}-jobrole"
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - ecs-tasks.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Policies:
+      - PolicyName: assumeRolePolicy
+        PolicyDocument:
+          Statement:
+          - Effect: "Allow"
+            Action:
+            - "sts:AssumeRole"
+            Resource:
+            - !Sub "arn:aws:iam::*:role/${CloudSploitRoleToAssume}"
+      - PolicyName: writeReportsBucketPolicy
+        PolicyDocument:
+          Statement:
+          - Effect: "Allow"
+            Action:
+            - "s3:PutObject"
+            Resource:
+            - !Sub "arn:aws:s3:::${CloudSploitBucket}/reports/*"
+
+  CloudSploitScheduledRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: "ScheduledRule"
+      ScheduleExpression: !Ref CloudSploitFrequency
+      State: ENABLED
+      Targets:
+      - Id: "CloudSploitSaturday"
+        Arn: !GetAtt CloudSploitJobLauncherLambda.Arn
+
+  PermissionForRuleToInvokeLambda:
+    Type: "AWS::Lambda::Permission"
+    Properties:
+      FunctionName: !Ref CloudSploitJobLauncherLambda
+      Action: "lambda:InvokeFunction"
+      Principal: "events.amazonaws.com"
+      SourceArn: !Sub ${CloudSploitScheduledRule.Arn}
+
+  CloudSploitJobLauncherLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${TagApp}-lambda-invoke"
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: "lambda.amazonaws.com"
+          Action:
+          - sts:AssumeRole
+      Path: "/"
+      Policies:
+      - PolicyName: assumeRoleOrganizationsPolicy
+        PolicyDocument:
+          Statement:
+          - Effect: "Allow"
+            Action:
+            - "sts:AssumeRole"
+            Resource:
+            - !Sub "arn:aws:iam::*:role/${CloudSploitOrganizationsRole}"
+      - PolicyName: accessConfigBucketPolicy
+        PolicyDocument:
+          Statement:
+          - Effect: "Allow"
+            Action:
+            - "s3:GetObject"
+            Resource:
+            - !Sub "arn:aws:s3:::${CloudSploitBucket}/config/accounts.list"
+      - PolicyName: launch-jobs-allow
+        PolicyDocument:
+          Statement:
+          - Effect: Allow
+            Action:
+            - logs:PutLogEvents
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            Resource:
+            - "arn:aws:logs:*:*:*"
+          - Effect: Allow
+            Action:
+            - batch:DescribeJobs
+            - batch:ListJobs
+            - batch:SubmitJob
+            Resource:
+            - "*"
+
+  CloudSploitLambdaLogGroup:
+    Type: "AWS::Logs::LogGroup"
+    Properties: 
+      LogGroupName: !Sub '/aws/lambda/${TagBlock}-${TagApp}' 
+      RetentionInDays: 30
+
+  CloudSploitJobLauncherLambda:
+    Type: "AWS::Lambda::Function"
+    Properties: 
+      FunctionName: !Sub '${TagBlock}-${TagApp}'
+      Description: "Launch CloudSploit scan jobs"
+      Handler: "index.lambda_handler"
+      Code:
+        ZipFile: |
+                  import os
+                  import json
+                  import boto3
+                  def lambda_handler(event, context):
+                    CLOUDSPLOIT_ROLE_TO_ASSUME = os.environ['CLOUDSPLOIT_ROLE_TO_ASSUME']
+                    client = boto3.client('batch')
+                    for accountId in retreiveAccountList():
+                      response = client.submit_job(
+                        jobName=os.environ['JOBNAME'] + "-" + accountId,
+                        jobQueue=os.environ['JOBQUEUE'],
+                        jobDefinition=os.environ['JOBDEFINITION'],
+                        containerOverrides={
+                          'environment': [
+                            {
+                              'name': 'ACCOUNT',
+                              'value': accountId
+                            },
+                            {
+                              'name': 'CLOUDSPLOIT_ROLE_TO_ASSUME',
+                              'value': CLOUDSPLOIT_ROLE_TO_ASSUME
+                            },
+                          ]
+                        }
+                      )
+                      print("Job %s launched with jobId %s to scan account %s with role %s" % (response['jobName'], response['jobId'], accountId, CLOUDSPLOIT_ROLE_TO_ASSUME))
+                  
+                  def retreiveAccountList():
+                    CONFIGFILE_BUCKET = os.environ['CONFIGFILE_BUCKET']
+                    CONFIGFILE_NAME = os.environ['CONFIGFILE_NAME']
+                    tempFile = '/tmp/accounts.list'
+                    accountList=[]
+                    
+                    s3client = boto3.client('s3')
+                    s3client.download_file(CONFIGFILE_BUCKET, CONFIGFILE_NAME, tempFile)
+                    for line in open(tempFile):
+                      li=line.strip()
+                      if not li.startswith("#"):
+                        accountList.append(line.rstrip())
+                    return accountList
+      Environment:
+        Variables:
+          JOBNAME: "cloudsploit-job"
+          JOBQUEUE: !Ref CloudSploitJobQueue
+          JOBDEFINITION: !Ref CloudSploitJobDefinition
+          CONFIGFILE_BUCKET: !Ref CloudSploitBucket
+          CONFIGFILE_NAME: "config/accounts.list"
+          CLOUDSPLOIT_ROLE_TO_ASSUME: !Ref CloudSploitRoleToAssume
+      MemorySize: 128
+      Role: !Sub ${CloudSploitJobLauncherLambdaRole.Arn}
+      Runtime: "python3.6"
+      Timeout: 60
+      Tags:
+      - Key: Block
+        Value: !Ref TagBlock
+      - Key: Org
+        Value: !Ref TagOrg
+      - Key: App
+        Value: !Ref TagApp
+

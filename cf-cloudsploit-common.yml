@@ -1,0 +1,64 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Common resources for CloudSploit Batch
+# Stack Name : cloudsploit-common
+# Description : this stack creates the CloudSploit main stack prerequisites :
+# - one ECR repository
+# - one S3 bucket
+
+
+Parameters:
+
+  TagBlock:
+    Description: Applicative block tag
+    Type: String
+
+  TagApp:
+    Description: Application referenced by this stack
+    Type: String
+
+  TagOrg:
+    Description: Organization Unit
+    Type: String
+
+  CloudSploitEcrRepoName:
+    Description: ECR name for the CloudSploit repo
+    Type: String
+
+
+Resources:
+
+  CloudSploitEcrRepository:
+    Type: AWS::ECR::Repository
+    Properties: 
+      RepositoryName: !Sub '${CloudSploitEcrRepoName}'
+
+  CloudSploitS3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${TagApp}-${AWS::AccountId}'
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+        - ServerSideEncryptionByDefault:
+            SSEAlgorithm: AES256
+      Tags:
+      - Key: Block
+        Value: !Sub '${TagBlock}'
+      - Key: App
+        Value: !Sub '${TagApp}'
+      - Key: Org
+        Value: !Sub '${TagOrg}'
+
+Outputs:
+
+  CloudSploitEcrRepository:
+    Description: CloudSploit ECR repository
+    Value: !GetAtt CloudSploitEcrRepository.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-EcrRepository"
+
+  CloudSploitS3Bucket:
+    Description: CloudSploit S3 bucket
+    Value: !GetAtt CloudSploitS3Bucket.Arn
+    Export:
+      Name: !Sub "${AWS::StackName}-S3Bucket"
+
