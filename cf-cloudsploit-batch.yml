@@ -326,7 +326,7 @@ Resources:
                     CLOUDSPLOIT_ROLE_TO_ASSUME = os.environ['CLOUDSPLOIT_ROLE_TO_ASSUME']
                     ORGANIZATIONS_ROLE = os.environ['ORGANIZATIONS_ROLE']
                     ORGANIZATIONS_ACCOUNT = os.environ['ORGANIZATIONS_ACCOUNT']
-                    session = get_session(role=orgRole, account=orgAccount, session_name='cloudsploit_lambda')
+                    session = get_session(role=ORGANIZATIONS_ROLE, account=ORGANIZATIONS_ACCOUNT, session_name='prowler_lambda')
                     accounts = getAllActiveAccounts(session)
                     print("Found %s accounts to scan." % (len(accounts)))
 
