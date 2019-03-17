@@ -71,12 +71,12 @@ Parameters:
   CloudSploitRoleToAssume:
     Description: IAM role to assume on the spoke account to CloudSploit
     Type: String
-    Default: cloudsploit-scan-assumerole
+    Default: cloudsploit-scan-role
 
   CloudSploitOrganizationsRole:
     Description: IAM role to assume on the Organizations account to CloudSploit
     Type: String
-    Default: cloudsploit-organizations-assumerole
+    Default: cloudsploit-organizations-role
 
   CloudSploitOrganizationsAccount:
     Description: AWS accountId uisng Organizations

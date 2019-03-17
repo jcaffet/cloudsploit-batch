@@ -1,6 +1,7 @@
 ---
 AWSTemplateFormatVersion: '2010-09-09'
 Description: Stack providing cross account access for CloudSploit
+# Name : cloudsploit-organizations-role
 
 Parameters:
 
@@ -14,7 +15,7 @@ Resources:
   CloudSploitScanAssumeRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: cloudsploit-organizations-assumerole
+      RoleName: cloudsploit-organizations-role
       MaxSessionDuration: 3600
       AssumeRolePolicyDocument:
         Statement:
