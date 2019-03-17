@@ -69,7 +69,7 @@ Parameters:
     Type: String
 
   CloudSploitRoleToAssume:
-    Description: IAM role to assume on the child account to CloudSploit
+    Description: IAM role to assume on the spoke account to CloudSploit
     Type: String
     Default: cloudsploit-scan-assumerole
 
