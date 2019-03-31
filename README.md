@@ -13,7 +13,7 @@ CloudSploit batch simply runs [CloudSploit scanner engines](https://github.com/c
 It simply industrializes the deletion process thanks to the following AWS ressources :
 - CloudWatch Rule to trigger the deletion execution
 - Batch to ensure a pay per use strategy
-- ECR to host the Docker image that embeds aw-nuke
+- ECR to host the Docker image that embeds CloudSploit
 - Lambda to gather the accounts to perform and submit the jobs
 - S3 to store generated reports
 - Cloudwatch Logs to log the global acitivity
