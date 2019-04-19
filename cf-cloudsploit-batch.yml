@@ -12,7 +12,7 @@ Metadata:
         Parameters: ['ComputeEnvVPC', 'ComputeEnvSubnets']
       - Label:
           default: 'ComputeEnv Cpu'
-        Parameters: ['ComputeEnvMinCpu', 'ComputeEnvDesiredCpu', 'ComputeEnvMaxCpu']
+        Parameters: ['ComputeEnvMinCpu', 'ComputeEnvDesiredCpu', 'ComputeEnvMaxCpu', 'ComputeEnvInstanceTypes']
 
 Parameters:
 
@@ -50,19 +50,28 @@ Parameters:
     Type: List<AWS::EC2::Subnet::Id>
 
   ComputeEnvMinCpu:
-    Description: compute envs VPC location
+    Description: Compute Env Min CPU
     Type: Number
     Default: 0
 
   ComputeEnvDesiredCpu:
-    Description: compute envs VPC location
+    Description: Compute Env Desired CPU
     Type: Number
     Default: 0
 
   ComputeEnvMaxCpu:
-    Description: compute envs VPC location
+    Description: Compute Env Max CPU
     Type: Number
     Default: 2
+
+  ComputeEnvInstanceTypes:
+    Description: Compute Env Instance Types
+    Type: String
+    Default: optimal
+    AllowedValues:
+    - optimal
+    - c3
+    - c4
 
   CloudSploitEcrImage:
     Description: ECR image to use
@@ -139,7 +148,7 @@ Resources:
         SpotIamFleetRole: !Ref SpotFleetRole
         InstanceRole: !Ref EcsInstanceProfile
         InstanceTypes:
-          - c5
+        - !Ref ComputeEnvInstanceTypes
         Tags: {Name: !Ref DisplayName, Block: !Ref TagBlock, App: !Ref TagApp, Org: !Ref TagOrg}
       State: ENABLED
 
