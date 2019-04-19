@@ -12,11 +12,11 @@ export AWS_SESSION_TOKEN=`cat ${TMP_ASSUME_ROLE_FILE} | jq -r .Credentials.Sessi
 
 now=`date +'%Y-%m-%d'`
 report_file_prefix=${ACCOUNT}-${now}
-echo "Generating CloudSploit PCI DSS report ..."
+echo "Generating CloudSploit PCI DSS compliance report ..."
 node index.js --compliance=pci >${report_file_prefix}-pcidss.txt
 
-echo "Generating CloudSploit HIPAA report ..."
-node index.js --compliance=hipaa >${report_file_prefix}-hipaa.txt
+echo "Generating CloudSploit CIS Benchmarks compliance report ..."
+node index.js --compliance=cis >${report_file_prefix}-cis.txt
 
 echo "Saving the report files in s3://${CLOUDSPLOIT_BUCKET}/reports/${ACCOUNT}"
 unset AWS_SECRET_ACCESS_KEY
