@@ -1,8 +1,8 @@
 #!/bin/bash
 
 usage(){
-    echo "Usage: $0 <profile> <environment>" 
-    echo "profile : aws profile to use for deployment" 
+    echo "Usage: $0 <profile> <environment>"
+    echo "profile : aws profile to use for deployment"
 }
 
 if [ $# -eq 1 ]; then
@@ -19,6 +19,5 @@ aws --profile=${profile} cloudformation create-stack \
     --template-body file://cf-cloudsploit-common.yml \
     --parameters ParameterKey=TagBlock,ParameterValue=security \
                  ParameterKey=TagApp,ParameterValue=cloudsploit \
-                 ParameterKey=TagOrg,ParameterValue=cloudaccelerationteam \
+                 ParameterKey=TagOrg,ParameterValue=cloudteam \
                  ParameterKey=CloudSploitEcrRepoName,ParameterValue=cloudaccelerationteam/cloudsploit
-
