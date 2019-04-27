@@ -34,5 +34,7 @@ CloudSploit needs :
 4. deploy the cf-cloudsploit-spoke-account.yaml in all the accounts using to scan. To make it easy, use StackSets Stacks from the AWS Organizations level.
 6. deploy the cf-cloudsploit-batch.yml Cloudformation stack in the central account
 
+Do not forget a strong ExternalId like UUID.
+
 ## How to use it
 Scans are perform on a configured daily basis and reports are stored in the S3 bucket.
