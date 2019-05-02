@@ -2,10 +2,15 @@
 
 TMP_ASSUME_ROLE_FILE=/tmp/assume-role.json
 
-echo "Collecting credentials for ${ACCOUNT} for role ${CLOUDSPLOIT_ROLE_TO_ASSUME}"
-aws sts assume-role --role-arn arn:aws:iam::${ACCOUNT}:role/${CLOUDSPLOIT_ROLE_TO_ASSUME} \
+if [ -z "${ACCOUNT}" ]; then echo "ACCOUNT not set !"; exit 1; fi
+if [ -z "${REPORTING_BUCKET}" ]; then echo "REPORTING_BUCKET not set !"; exit 1; fi
+if [ -z "${CLOUDSPLOIT_SCAN_ROLE}" ]; then echo "CLOUDSPLOIT_SCAN_ROLE not set !"; exit 1; fi
+if [ -z "${CLOUDSPLOIT_ROLE_EXTERNALID}" ]; then echo "CLOUDSPLOIT_ROLE_EXTERNALID not set !"; exit 1; fi
+
+echo "Collecting credentials for ${ACCOUNT} with role ${CLOUDSPLOIT_SCAN_ROLE}"
+aws sts assume-role --role-arn arn:aws:iam::${ACCOUNT}:role/${CLOUDSPLOIT_SCAN_ROLE} \
 										--external-id ${CLOUDSPLOIT_ROLE_EXTERNALID} \
-	                  --role-session-name ${CLOUDSPLOIT_ROLE_TO_ASSUME} \
+	                  --role-session-name ${CLOUDSPLOIT_SCAN_ROLE} \
 										>${TMP_ASSUME_ROLE_FILE}
 
 export AWS_SECRET_ACCESS_KEY=`cat ${TMP_ASSUME_ROLE_FILE} | jq -r .Credentials.SecretAccessKey`
@@ -17,16 +22,20 @@ if [ -z "${AWS_ACCESS_KEY_ID}" ]; then echo "AWS_ACCESS_KEY_ID not set !"; exit 
 export AWS_SESSION_TOKEN=`cat ${TMP_ASSUME_ROLE_FILE} | jq -r .Credentials.SessionToken`
 if [ -z "${AWS_SESSION_TOKEN}" ]; then echo "AWS_SESSION_TOKEN not set !"; exit 1; fi
 
-now=`date +'%Y-%m-%d'`
-report_file_prefix=${ACCOUNT}-${now}
-echo "Generating CloudSploit PCI DSS compliance report ..."
+today=`date +'%Y-%m-%d'`
+report_file_prefix=${ACCOUNT}-${today}-cloudsploit
+
+echo "Generating CloudSploit PCI DSS compliance report in ${report_file_prefix}-pcidss.txt ..."
 node index.js --compliance=pci >${report_file_prefix}-pcidss.txt
 
-echo "Generating CloudSploit CIS Benchmarks compliance report ..."
+echo "Generating CloudSploit CIS Benchmarks compliance report in ${report_file_prefix}-cis.txt ..."
 node index.js --compliance=cis >${report_file_prefix}-cis.txt
 
-echo "Saving the report files in s3://${CLOUDSPLOIT_BUCKET}/reports/${ACCOUNT}"
+echo "Saving the report files in s3://${REPORTING_BUCKET}/${ACCOUNT}"
 unset AWS_SECRET_ACCESS_KEY
 unset AWS_ACCESS_KEY_ID
 unset AWS_SESSION_TOKEN
-aws s3 cp . s3://${CLOUDSPLOIT_BUCKET}/reports/${ACCOUNT}/ --exclude="*" --include="${report_file_prefix}*" --recursive
+aws s3 cp . s3://${REPORTING_BUCKET}/${ACCOUNT}/ \
+						--exclude="*" \
+						--include="${report_file_prefix}-*" \
+						--recursive

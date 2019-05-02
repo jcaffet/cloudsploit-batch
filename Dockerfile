@@ -1,5 +1,10 @@
 FROM amazonlinux:latest
-RUN yum -y install which unzip aws-cli jq tar gzip
+
+RUN yum -y update \
+ && yum -y install which unzip aws-cli jq tar gzip \
+ && yum clean all
+
+WORKDIR /scans
 
 ENV NVM_DIR /usr/local/nvm
 ENV NODE_VERSION 10.15.3
@@ -19,10 +24,8 @@ RUN node --version
 ADD ./scans /scans
 
 RUN cd /scans && \
-    npm install 
+    npm install
 
 ADD docker-entrypoint.sh /scans/docker-entrypoint.sh
 RUN chmod 744 /scans/docker-entrypoint.sh
-WORKDIR /scans
 ENTRYPOINT ["/scans/docker-entrypoint.sh"]
-

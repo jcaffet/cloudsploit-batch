@@ -8,33 +8,39 @@ Metadata:
   AWS::CloudFormation::Interface:
     ParameterGroups:
       - Label:
-          default: 'ComputeEnv network'
+          default: 'ComputeEnv Network'
         Parameters: ['ComputeEnvVPC', 'ComputeEnvSubnets']
       - Label:
           default: 'ComputeEnv Cpu'
         Parameters: ['ComputeEnvMinCpu', 'ComputeEnvDesiredCpu', 'ComputeEnvMaxCpu', 'ComputeEnvInstanceTypes']
+      - Label:
+          default: 'Access to the AWS Organizations account'
+        Parameters: ['CloudSploitOrganizationsAccount', 'CloudSploitOrganizationsRole', 'CloudSploitOrganizationsRoleExternalId']
+      - Label:
+          default: 'Access to the spoke accounts'
+        Parameters: ['CloudSploitScanRole', 'CloudSploitScanRoleExternalId']
 
 Parameters:
 
   DisplayName:
     Description: Project name
     Type: String
-    Default: "cloudsploit"
+    Default: cloudsploit
 
   TagBlock:
     Description: Applicative block tag
     Type: String
-    Default: "security"
+    Default: security
 
   TagApp:
     Description: Application tag
     Type: String
-    Default: "cloudsploit"
+    Default: cloudsploit
 
   TagOrg:
     Description: Organization tag
     Type: String
-    Default: "cloudsecteam"
+    Default: cloudteam
 
   CloudSploitFrequency:
     Description: define execution frequency
@@ -77,13 +83,13 @@ Parameters:
     Description: ECR image to use
     Type: String
 
-  CloudSploitRoleToAssume:
-    Description: IAM role to assume on the spoke account to CloudSploit
+  CloudSploitScanRole:
+    Description: IAM role to assume on the spoke accounts for CloudSploit
     Type: String
     Default: cloudsploit-scan-role
 
-  CloudSploitRoleExternalId:
-    Description: CloudSploit Role ExternalID
+  CloudSploitScanRoleExternalId:
+    Description: ExternalId for roles on spoke accounts
     Type: String
 
   CloudSploitOrganizationsRole:
@@ -91,12 +97,16 @@ Parameters:
     Type: String
     Default: cloudsploit-organizations-role
 
+  CloudSploitOrganizationsRoleExternalId:
+    Description: ExternalId of role on the Organizations account for CloudSploit
+    Type: String
+
   CloudSploitOrganizationsAccount:
     Description: AWS accountId uisng Organizations
     Type: String
 
-  CloudSploitBucket:
-    Description: S3 bucket for CloudSploit assets
+  CloudSploitReportingBucket:
+    Description: S3 bucket for CloudSploit reporting
     Type: String
 
 
@@ -214,8 +224,12 @@ Resources:
         Vcpus: 1
         Image: !Ref CloudSploitEcrImage
         Environment:
-          - Name: CLOUDSPLOIT_BUCKET
-            Value: !Ref CloudSploitBucket
+        - Name: REPORTING_BUCKET
+          Value: !Ref CloudSploitReportingBucket
+        - Name: CLOUDSPLOIT_SCAN_ROLE
+          Value: !Ref CloudSploitScanRole
+        - Name: CLOUDSPLOIT_ROLE_EXTERNALID
+          Value: !Ref CloudSploitScanRoleExternalId
       RetryStrategy:
         Attempts: 1
 
@@ -242,15 +256,15 @@ Resources:
             Action:
             - "sts:AssumeRole"
             Resource:
-            - !Sub "arn:aws:iam::*:role/${CloudSploitRoleToAssume}"
-      - PolicyName: writeReportsBucketPolicy
+            - !Sub "arn:aws:iam::*:role/${CloudSploitScanRole}"
+      - PolicyName: writeReportingBucketPolicy
         PolicyDocument:
           Statement:
           - Effect: "Allow"
             Action:
             - "s3:PutObject"
             Resource:
-            - !Sub "arn:aws:s3:::${CloudSploitBucket}/reports/*"
+            - !Sub "arn:aws:s3:::${CloudSploitReportingBucket}/*"
 
   CloudSploitScheduledRule:
     Type: AWS::Events::Rule
@@ -291,14 +305,6 @@ Resources:
             - "sts:AssumeRole"
             Resource:
             - !Sub "arn:aws:iam::*:role/${CloudSploitOrganizationsRole}"
-      - PolicyName: accessConfigBucketPolicy
-        PolicyDocument:
-          Statement:
-          - Effect: "Allow"
-            Action:
-            - "s3:GetObject"
-            Resource:
-            - !Sub "arn:aws:s3:::${CloudSploitBucket}/config/accounts.list"
       - PolicyName: launch-jobs-allow
         PolicyDocument:
           Statement:
@@ -334,13 +340,12 @@ Resources:
                   import os
                   import json
                   import boto3
-                  def lambda_handler(event, context):
 
-                    CLOUDSPLOIT_ROLE_TO_ASSUME = os.environ['CLOUDSPLOIT_ROLE_TO_ASSUME']
-                    CLOUDSPLOIT_ROLE_EXTERNALID = os.environ['CLOUDSPLOIT_ROLE_EXTERNALID']
+                  def lambda_handler(event, context):
                     ORGANIZATIONS_ROLE = os.environ['ORGANIZATIONS_ROLE']
+                    ORGANIZATIONS_ROLE_EXTERNALID = os.environ['ORGANIZATIONS_ROLE_EXTERNALID']
                     ORGANIZATIONS_ACCOUNT = os.environ['ORGANIZATIONS_ACCOUNT']
-                    session = get_session(account=ORGANIZATIONS_ACCOUNT,role=ORGANIZATIONS_ROLE, externalId=CLOUDSPLOIT_ROLE_EXTERNALID,session_name='cloudsploit_lambda')
+                    session = get_session(account=ORGANIZATIONS_ACCOUNT,role=ORGANIZATIONS_ROLE, externalId=ORGANIZATIONS_ROLE_EXTERNALID, session_name='cloudsploit_lambda')
                     accounts = getAllActiveAccounts(session)
                     print("Found %s accounts to scan." % (len(accounts)))
 
@@ -356,21 +361,12 @@ Resources:
                               'name': 'ACCOUNT',
                               'value': accountId
                             },
-                            {
-                              'name': 'CLOUDSPLOIT_ROLE_TO_ASSUME',
-                              'value': CLOUDSPLOIT_ROLE_TO_ASSUME
-                            },
-                            {
-                              'name': 'CLOUDSPLOIT_ROLE_EXTERNALID',
-                              'value': CLOUDSPLOIT_ROLE_EXTERNALID
-                            },
                           ]
                         }
                       )
-                      print("Job %s launched with jobId %s to scan account %s with role %s" % (response['jobName'], response['jobId'], accountId, CLOUDSPLOIT_ROLE_TO_ASSUME))
+                      print("Job %s launched with jobId %s to scan account %s" % (response['jobName'], response['jobId'], accountId))
 
                   def get_session(account=None, role=None, externalId=None, region=None, session_name='my_session'):
-
                       # If the role is given : assumes a role and returns boto3 session
                       # otherwise : returns a regular session with the current IAM user/role
                       if role:
@@ -387,7 +383,6 @@ Resources:
                           return boto3.Session()
 
                   def getAllActiveAccounts(session):
-
                       client = session.client('organizations')
                       paginator = client.get_paginator('list_accounts')
                       page_iterator = paginator.paginate()
@@ -399,30 +394,13 @@ Resources:
                               if account['Status'] == "ACTIVE":
                                 activeAccountIds.append(account[ "Id" ])
                       return activeAccountIds
-
-                  def retreiveAccountList():
-                    CONFIGFILE_BUCKET = os.environ['CONFIGFILE_BUCKET']
-                    CONFIGFILE_NAME = os.environ['CONFIGFILE_NAME']
-                    tempFile = '/tmp/accounts.list'
-                    accountList=[]
-
-                    s3client = boto3.client('s3')
-                    s3client.download_file(CONFIGFILE_BUCKET, CONFIGFILE_NAME, tempFile)
-                    for line in open(tempFile):
-                      li=line.strip()
-                      if not li.startswith("#"):
-                        accountList.append(line.rstrip())
-                    return accountList
       Environment:
         Variables:
           JOBNAME: "cloudsploit-job"
           JOBQUEUE: !Ref CloudSploitJobQueue
           JOBDEFINITION: !Ref CloudSploitJobDefinition
-          CONFIGFILE_BUCKET: !Ref CloudSploitBucket
-          CONFIGFILE_NAME: "config/accounts.list"
-          CLOUDSPLOIT_ROLE_TO_ASSUME: !Ref CloudSploitRoleToAssume
-          CLOUDSPLOIT_ROLE_EXTERNALID: !Ref CloudSploitRoleExternalId
           ORGANIZATIONS_ROLE: !Ref CloudSploitOrganizationsRole
+          ORGANIZATIONS_ROLE_EXTERNALID: !Ref CloudSploitOrganizationsRoleExternalId
           ORGANIZATIONS_ACCOUNT: !Ref CloudSploitOrganizationsAccount
       MemorySize: 128
       Role: !Sub ${CloudSploitJobLauncherLambdaRole.Arn}

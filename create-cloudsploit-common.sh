@@ -1,7 +1,7 @@
 #!/bin/bash
 
 usage(){
-    echo "Usage: $0 <profile> <environment>"
+    echo "Usage: $0 <profile>"
     echo "profile : aws profile to use for deployment"
 }
 
@@ -13,11 +13,12 @@ else
 fi
 
 echo "Creating stack"
+APP=cloudsploit
 aws --profile=${profile} cloudformation create-stack \
-    --stack-name cloudsploit-common \
+    --stack-name ${APP}-common \
     --capabilities CAPABILITY_NAMED_IAM \
-    --template-body file://cf-cloudsploit-common.yml \
+    --template-body file://cf-${APP}-common.yml \
     --parameters ParameterKey=TagBlock,ParameterValue=security \
-                 ParameterKey=TagApp,ParameterValue=cloudsploit \
+                 ParameterKey=TagApp,ParameterValue=${APP} \
                  ParameterKey=TagOrg,ParameterValue=cloudteam \
-                 ParameterKey=CloudSploitEcrRepoName,ParameterValue=cloudaccelerationteam/cloudsploit
+                 ParameterKey=CloudSploitEcrRepoName,ParameterValue=${APP}

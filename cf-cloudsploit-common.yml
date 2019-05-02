@@ -3,7 +3,7 @@ Description: Common resources for CloudSploit Batch
 # Stack Name : cloudsploit-common
 # Description : this stack creates the CloudSploit main stack prerequisites :
 # - one ECR repository
-# - one S3 bucket
+# - if needed, one S3 bucket to store reports (otherwise use an external one)
 
 
 Parameters:
@@ -11,29 +11,42 @@ Parameters:
   TagBlock:
     Description: Applicative block tag
     Type: String
+    Default: security
 
   TagApp:
-    Description: Application referenced by this stack
+    Description: Application tag
     Type: String
+    Default: cloudsploit
 
   TagOrg:
-    Description: Organization Unit
+    Description: Organization tag
     Type: String
+    Default: cloudteam
 
   CloudSploitEcrRepoName:
     Description: ECR name for the CloudSploit repo
     Type: String
+    Default: cloudsploit
 
+  UseOwnReportingBucket:
+    Description: Enable a dedicated Bucket to store reports
+    Type: String
+    Default: true
+    AllowedValues: [true, false]
+
+Conditions:
+  HasOwnReportingBucket: !Equals [!Ref UseOwnReportingBucket, true]
 
 Resources:
 
   CloudSploitEcrRepository:
     Type: AWS::ECR::Repository
-    Properties: 
+    Properties:
       RepositoryName: !Sub '${CloudSploitEcrRepoName}'
 
-  CloudSploitS3Bucket:
+  CloudSploitReportingBucket:
     Type: AWS::S3::Bucket
+    Condition: HasOwnReportingBucket
     Properties:
       BucketName: !Sub '${TagApp}-${AWS::AccountId}'
       BucketEncryption:
@@ -51,14 +64,7 @@ Resources:
 Outputs:
 
   CloudSploitEcrRepository:
-    Description: CloudSploit ECR repository
+    Description: CloudSploit ECR repository Arn
     Value: !GetAtt CloudSploitEcrRepository.Arn
     Export:
       Name: !Sub "${AWS::StackName}-EcrRepository"
-
-  CloudSploitS3Bucket:
-    Description: CloudSploit S3 bucket
-    Value: !GetAtt CloudSploitS3Bucket.Arn
-    Export:
-      Name: !Sub "${AWS::StackName}-S3Bucket"
-
