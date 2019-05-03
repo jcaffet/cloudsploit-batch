@@ -28,12 +28,12 @@ CloudSploit needs :
 
 ## Installation
 
-1. deploy the ![cf-cloudsploit-common.yml](cf-cloudsploit-common.yml) CloudFormation stack in the central account
+1. deploy the [cf-cloudsploit-common.yml](cf-cloudsploit-common.yml) CloudFormation stack in the central account
 2. Git clone cloudsploit scans repository in the cloudsploit-batch directory
 3. Build, tag and push the Docker image. Follow the information provided in the ECR repository page.
-4. deploy the ![cf-cloudsploit-org-account.yml](cf-cloudsploit-org-account.yml) in the account using AWS Organizations.
-5. deploy the ![cf-cloudsploit-spoke-account.yml](cf-cloudsploit-spoke-account.yml) in all the spoke accounts to scan. To make it easy, use StackSets Stacks from the AWS Organizations level.
-6. deploy the ![cf-cloudsploit-batch.yml](cf-cloudsploit-batch.yml) CloudFormation stack in the central account
+4. deploy the [cf-cloudsploit-org-account.yml](cf-cloudsploit-org-account.yml) in the account using AWS Organizations.
+5. deploy the [cf-cloudsploit-spoke-account.yml](cf-cloudsploit-spoke-account.yml) in all the spoke accounts to scan. To make it easy, use StackSets Stacks from the AWS Organizations level.
+6. deploy the [cf-cloudsploit-batch.yml](cf-cloudsploit-batch.yml) CloudFormation stack in the central account
 
 Do not forget two different strong ExternalIds like UUID (one for Organizations role, one for scan role)
 
