@@ -332,7 +332,7 @@ Resources:
   CloudSploitJobLauncherLambda:
     Type: "AWS::Lambda::Function"
     Properties:
-      FunctionName: !Sub '${TagBlock}-${TagApp}'
+      FunctionName: !Sub '${TagApp}-launcher'
       Description: "Launch CloudSploit scan jobs"
       Handler: "index.lambda_handler"
       Code:
