@@ -404,7 +404,7 @@ Resources:
           ORGANIZATIONS_ACCOUNT: !Ref CloudSploitOrganizationsAccount
       MemorySize: 128
       Role: !Sub ${CloudSploitJobLauncherLambdaRole.Arn}
-      Runtime: "python3.6"
+      Runtime: "python3.7"
       Timeout: 60
       Tags:
       - Key: Block
