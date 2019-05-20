@@ -326,7 +326,7 @@ Resources:
   CloudSploitLambdaLogGroup:
     Type: "AWS::Logs::LogGroup"
     Properties:
-      LogGroupName: !Sub '/aws/lambda/${TagBlock}-${TagApp}'
+      LogGroupName: !Sub '/aws/lambda/${CloudSploitJobLauncherLambda}'
       RetentionInDays: 30
 
   CloudSploitJobLauncherLambda:
