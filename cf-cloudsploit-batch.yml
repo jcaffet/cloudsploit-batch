@@ -342,15 +342,15 @@ Resources:
                   import boto3
 
                   def lambda_handler(event, context):
-                    ORGANIZATIONS_ROLE = os.environ['ORGANIZATIONS_ROLE']
-                    ORGANIZATIONS_ROLE_EXTERNALID = os.environ['ORGANIZATIONS_ROLE_EXTERNALID']
-                    ORGANIZATIONS_ACCOUNT = os.environ['ORGANIZATIONS_ACCOUNT']
-                    session = get_session(account=ORGANIZATIONS_ACCOUNT,role=ORGANIZATIONS_ROLE, externalId=ORGANIZATIONS_ROLE_EXTERNALID, session_name='cloudsploit_lambda')
-                    accounts = getAllActiveAccounts(session)
-                    print("Found %s accounts to scan." % (len(accounts)))
+                      ORGANIZATIONS_ROLE = os.environ['ORGANIZATIONS_ROLE']
+                      ORGANIZATIONS_ROLE_EXTERNALID = os.environ['ORGANIZATIONS_ROLE_EXTERNALID']
+                      ORGANIZATIONS_ACCOUNT = os.environ['ORGANIZATIONS_ACCOUNT']
+                      session = get_session(account=ORGANIZATIONS_ACCOUNT,role=ORGANIZATIONS_ROLE, externalId=ORGANIZATIONS_ROLE_EXTERNALID, session_name='cloudsploit_lambda')
+                      accounts = getAllActiveAccounts(session)
+                      print("Found %s accounts to scan." % (len(accounts)))
 
-                    client = boto3.client('batch')
-                    for accountId in accounts:
+                      client = boto3.client('batch')
+                      for accountId in accounts:
                       response = client.submit_job(
                         jobName=os.environ['JOBNAME'] + "-" + accountId,
                         jobQueue=os.environ['JOBQUEUE'],
@@ -373,11 +373,10 @@ Resources:
                           client = boto3.client('sts')
                           role_arn = 'arn:aws:iam::' + account + ':role/' + role
                           response = client.assume_role(RoleArn=role_arn, ExternalId=externalId, RoleSessionName=session_name)
-                          session = boto3.Session(
-                              aws_access_key_id=response['Credentials']['AccessKeyId'],
-                              aws_secret_access_key=response['Credentials']['SecretAccessKey'],
-                              aws_session_token=response['Credentials']['SessionToken'],
-                              region_name=region)
+                          session = boto3.Session(aws_access_key_id=response['Credentials']['AccessKeyId'],
+                                                  aws_secret_access_key=response['Credentials']['SecretAccessKey'],
+                                                  aws_session_token=response['Credentials']['SessionToken'],
+                                                  region_name=region)
                           return session
                       else:
                           return boto3.Session()
