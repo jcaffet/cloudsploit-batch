@@ -10,7 +10,7 @@ It ensures cost containment and security hardening.
 ## Technicals details
 
 CloudSploit batch simply runs [CloudSploit scanner engines](https://github.com/cloudsploit/scans) into AWS Batch jobs.
-It simply industrializes the deletion process thanks to the following AWS resources :
+It simply industrializes the scan process thanks to the following AWS resources :
 - CloudWatch Rule to trigger the deletion execution
 - Batch to ensure a pay per use strategy
 - ECR to host the Docker image that embeds CloudSploit
