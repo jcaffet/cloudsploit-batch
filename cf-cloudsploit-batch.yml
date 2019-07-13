@@ -15,7 +15,7 @@ Metadata:
         Parameters: ['ComputeEnvMinCpu', 'ComputeEnvDesiredCpu', 'ComputeEnvMaxCpu', 'ComputeEnvInstanceTypes']
       - Label:
           default: 'Access to the AWS Organizations account'
-        Parameters: ['CloudSploitOrganizationsAccount', 'CloudSploitOrganizationsRole', 'CloudSploitOrganizationsRoleExternalId']
+        Parameters: ['OrganizationsAccount', 'OrganizationsRole', 'OrganizationsRoleExternalId']
       - Label:
           default: 'Access to the spoke accounts'
         Parameters: ['CloudSploitScanRole', 'CloudSploitScanRoleExternalId']
@@ -46,6 +46,11 @@ Parameters:
     Description: define execution frequency
     Type: String
     Default: "cron(0 5 ? * * *)"
+
+  CloudSploitHarversterFrequency:
+    Description: define execution frequency of the account harverster
+    Type: String
+    Default: "cron(0 3 ? * * *)"
 
   ComputeEnvVPC:
     Description: compute envs VPC location
@@ -92,16 +97,16 @@ Parameters:
     Description: ExternalId for roles on spoke accounts
     Type: String
 
-  CloudSploitOrganizationsRole:
+  OrganizationsRole:
     Description: IAM role to assume on the Organizations account to CloudSploit
     Type: String
     Default: cloudsploit-organizations-role
 
-  CloudSploitOrganizationsRoleExternalId:
+  OrganizationsRoleExternalId:
     Description: ExternalId of role on the Organizations account for CloudSploit
     Type: String
 
-  CloudSploitOrganizationsAccount:
+  OrganizationsAccount:
     Description: AWS accountId uisng Organizations
     Type: String
 
@@ -109,6 +114,10 @@ Parameters:
     Description: S3 bucket for CloudSploit reporting
     Type: String
 
+  CloudSploitSpokeStackSet:
+    Description: Name of the StackSet distributing spoke accounts
+    Type: String
+    Default: cloudsploit-spoke-account
 
 Resources:
 
@@ -304,7 +313,7 @@ Resources:
             Action:
             - "sts:AssumeRole"
             Resource:
-            - !Sub "arn:aws:iam::*:role/${CloudSploitOrganizationsRole}"
+            - !Sub "arn:aws:iam::*:role/${OrganizationsRole}"
       - PolicyName: launch-jobs-allow
         PolicyDocument:
           Statement:
@@ -397,11 +406,138 @@ Resources:
           JOBNAME: "cloudsploit-job"
           JOBQUEUE: !Ref CloudSploitJobQueue
           JOBDEFINITION: !Ref CloudSploitJobDefinition
-          ORGANIZATIONS_ROLE: !Ref CloudSploitOrganizationsRole
-          ORGANIZATIONS_ROLE_EXTERNALID: !Ref CloudSploitOrganizationsRoleExternalId
-          ORGANIZATIONS_ACCOUNT: !Ref CloudSploitOrganizationsAccount
+          ORGANIZATIONS_ROLE: !Ref OrganizationsRole
+          ORGANIZATIONS_ROLE_EXTERNALID: !Ref OrganizationsRoleExternalId
+          ORGANIZATIONS_ACCOUNT: !Ref OrganizationsAccount
       MemorySize: 128
       Role: !Sub ${CloudSploitJobLauncherLambdaRole.Arn}
+      Runtime: "python3.7"
+      Timeout: 60
+      Tags:
+      - Key: Block
+        Value: !Ref TagBlock
+      - Key: Org
+        Value: !Ref TagOrg
+      - Key: App
+        Value: !Ref TagApp
+
+  CloudSploitAccountHarversterScheduledRule:
+    Type: AWS::Events::Rule
+    Properties:
+      Description: "ScheduledRule"
+      ScheduleExpression: !Ref CloudSploitHarversterFrequency
+      State: ENABLED
+      Targets:
+      - Id: "CloudSploitAccountHarverster"
+        Arn: !GetAtt CloudSploitAccountHarversterLambda.Arn
+
+  PermissionForRuleToInvokeLambdaAccountHarverster:
+    Type: "AWS::Lambda::Permission"
+    Properties:
+      FunctionName: !Ref CloudSploitAccountHarversterLambda
+      Action: "lambda:InvokeFunction"
+      Principal: "events.amazonaws.com"
+      SourceArn: !GetAtt CloudSploitAccountHarversterScheduledRule.Arn
+
+  CloudSploitAccountHarversterLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${TagApp}-account-harverster-lambda-invoke"
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: "lambda.amazonaws.com"
+          Action:
+          - sts:AssumeRole
+      Path: "/"
+      Policies:
+      - PolicyName: assumeRoleOrganizationsPolicy
+        PolicyDocument:
+          Statement:
+          - Effect: "Allow"
+            Action:
+            - "sts:AssumeRole"
+            Resource:
+            - !Sub "arn:aws:iam::${OrganizationsAccount}:role/${OrganizationsRole}"
+      - PolicyName: write-cloudwatch-logs-allow
+        PolicyDocument:
+          Statement:
+          - Effect: Allow
+            Action:
+            - logs:PutLogEvents
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            Resource:
+            - "arn:aws:logs:*:*:*"
+
+  CloudSploitAccountHarversteLambdaLogGroup:
+    Type: "AWS::Logs::LogGroup"
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${CloudSploitAccountHarversterLambda}'
+      RetentionInDays: 30
+
+  CloudSploitAccountHarversterLambda:
+    Type: "AWS::Lambda::Function"
+    Properties:
+      FunctionName: !Sub '${TagApp}-account-harverster'
+      Description: "Launch CloudSploit Account Harverster"
+      Handler: "index.lambda_handler"
+      Code:
+        ZipFile: |
+                  import os
+                  import json
+                  import boto3
+                  def lambda_handler(event, context):
+                    ORGANIZATION_ROLE = os.environ['ORGANIZATION_ROLE']
+                    ORGANIZATION_ROLE_EXTERNALID = os.environ['ORGANIZATION_ROLE_EXTERNALID']
+                    ORGANIZATION_ACCOUNT = os.environ['ORGANIZATION_ACCOUNT']
+                    STACKSET_NAME = os.environ['STACKSET_NAME']
+                    STACKSET_REGION = os.environ['STACKSET_REGION']
+                    session = get_session(account=ORGANIZATION_ACCOUNT, role=ORGANIZATION_ROLE, externalId=ORGANIZATION_ROLE_EXTERNALID, session_name='guarddutyrecruiter_lambda')
+                    accountsList = getAllActiveAccounts(session)
+                    print("Found %s StackSet instances to update." % (len(accountsList)))
+
+                    client = session.client('cloudformation')
+                    response = client.create_stack_instances(StackSetName=STACKSET_NAME,Accounts=accountsList,Regions=[STACKSET_REGION], OperationPreferences={'MaxConcurrentPercentage': 100} )
+
+                  def get_session(account=None, role=None, externalId=None, region=None, session_name='my_session'):
+                      # If the role is given : assumes a role and returns boto3 session
+                      # otherwise : returns a regular session with the current IAM user/role
+                      if role:
+                          client = boto3.client('sts')
+                          role_arn = 'arn:aws:iam::' + account + ':role/' + role
+                          response = client.assume_role(RoleArn=role_arn, ExternalId=externalId, RoleSessionName=session_name)
+                          session = boto3.Session(
+                              aws_access_key_id=response['Credentials']['AccessKeyId'],
+                              aws_secret_access_key=response['Credentials']['SecretAccessKey'],
+                              aws_session_token=response['Credentials']['SessionToken'],
+                              region_name=region)
+                          return session
+                      else:
+                          return boto3.Session()
+
+                  def getAllActiveAccounts(session):
+                      client = session.client('organizations')
+                      paginator = client.get_paginator('list_accounts')
+                      page_iterator = paginator.paginate()
+
+                      activeAccountIds = []
+                      for page in page_iterator:
+                        if "Accounts" in page:
+                          for account in page[ "Accounts" ]:
+                              if account['Status'] == "ACTIVE":
+                                activeAccountIds.append(account[ "Id" ])
+                      return activeAccountIds
+      Environment:
+        Variables:
+          ORGANIZATION_ROLE: !Ref OrganizationsRole
+          ORGANIZATION_ROLE_EXTERNALID: !Ref OrganizationsRoleExternalId
+          ORGANIZATION_ACCOUNT: !Ref OrganizationsAccount
+          STACKSET_NAME: !Ref CloudSploitSpokeStackSet
+          STACKSET_REGION: !Sub "${AWS::Region}"
+      MemorySize: 128
+      Role: !GetAtt CloudSploitAccountHarversterLambdaRole.Arn
       Runtime: "python3.7"
       Timeout: 60
       Tags:

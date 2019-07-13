@@ -10,13 +10,18 @@ Parameters:
     Type: String
     ConstraintDescription: Must be a valid AWS account ID
 
-  CloudSploitRoleExternalId:
+  CloudSploitOrgRoleExternalId:
     Description: CloudSploit Role ExternalID
     Type: String
 
+  CloudSploitStackSetSpokeName:
+    Description: Name of the StackSet in charge of distributing spoke account assets
+    Type: String
+    Default: cloudsploit-spoke-account
+
 Resources:
 
-  CloudSploitScanAssumeRole:
+  CloudSploitOrgRole:
     Type: AWS::IAM::Role
     Properties:
       RoleName: cloudsploit-organizations-role
@@ -30,7 +35,7 @@ Resources:
           - sts:AssumeRole
           Condition:
             StringEquals:
-              "sts:ExternalId": !Sub '${CloudSploitRoleExternalId}'
+              "sts:ExternalId": !Sub '${CloudSploitOrgRoleExternalId}'
       Policies:
       - PolicyName: "AllowOrganizationListAccounts"
         PolicyDocument:
@@ -39,3 +44,10 @@ Resources:
           - Effect: "Allow"
             Action: organizations:ListAccounts
             Resource: '*'
+      - PolicyName: "AllowUpdateStackInstances"
+        PolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+          - Effect: "Allow"
+            Action: cloudformation:CreateStackInstances
+            Resource: !Sub "arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stackset/${CloudSploitStackSetSpokeName}:*"
