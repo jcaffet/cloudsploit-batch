@@ -13,7 +13,7 @@ It ensures cost containment and security hardening.
 
 ![CloudSploit Batch Diagram](images/cloudsploitbatch-diagram.png)
 
-## Content
+### Content
 
 CloudSploit batch simply runs [CloudSploit scanner engines](https://github.com/cloudsploit/scans) into AWS Batch jobs.
 It simply industrializes the scan process thanks to the following AWS resources :
