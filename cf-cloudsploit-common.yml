@@ -5,7 +5,6 @@ Description: Common resources for CloudSploit Batch
 # - one ECR repository
 # - if needed, one S3 bucket to store reports (otherwise use an external one)
 
-
 Parameters:
 
   TagBlock:
@@ -42,7 +41,14 @@ Resources:
   CloudSploitEcrRepository:
     Type: AWS::ECR::Repository
     Properties:
-      RepositoryName: !Sub '${CloudSploitEcrRepoName}'
+      RepositoryName: !Ref CloudSploitEcrRepoName
+      Tags:
+      - Key: Block
+        Value: !Ref TagBlock
+      - Key: App
+        Value: !Ref TagApp
+      - Key: Org
+        Value: !Ref TagOrg
 
   CloudSploitReportingBucket:
     Type: AWS::S3::Bucket
@@ -55,11 +61,11 @@ Resources:
             SSEAlgorithm: AES256
       Tags:
       - Key: Block
-        Value: !Sub '${TagBlock}'
+        Value: !Ref TagBlock
       - Key: App
-        Value: !Sub '${TagApp}'
+        Value: !Ref TagApp
       - Key: Org
-        Value: !Sub '${TagOrg}'
+        Value: !Ref TagOrg
 
 Outputs:
 
