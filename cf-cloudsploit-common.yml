@@ -33,6 +33,12 @@ Parameters:
     Default: true
     AllowedValues: [true, false]
 
+  DaysToRetainUntaggedContainerImages:
+    Description: Days to retain untagged images
+    Type: String
+    Default: 1
+
+
 Conditions:
   HasOwnReportingBucket: !Equals [!Ref UseOwnReportingBucket, true]
 
@@ -49,6 +55,25 @@ Resources:
         Value: !Ref TagApp
       - Key: Org
         Value: !Ref TagOrg
+      LifecyclePolicy:
+        LifecyclePolicyText: !Sub
+          - |
+            {
+              "rules": [
+                {
+                  "rulePriority": 1,
+                  "description": "Only keep untagged images for ${DaysToRetainUntaggedContainerImages} days",
+                  "selection": {
+                    "tagStatus": "untagged",
+                    "countType": "sinceImagePushed",
+                    "countUnit": "days",
+                    "countNumber": ${DaysToRetainUntaggedContainerImages}
+                  },
+                  "action": { "type": "expire" }
+                }
+              ]
+            }
+          - DaysToRetainUntaggedContainerImages: !Ref DaysToRetainUntaggedContainerImages
 
   CloudSploitReportingBucket:
     Type: AWS::S3::Bucket
