@@ -30,7 +30,7 @@ Resources:
           - sts:AssumeRole
           Condition:
             StringEquals:
-              "sts:ExternalId": !Sub '${CloudSploitRoleExternalId}'
+              "sts:ExternalId": !Ref CloudSploitRoleExternalId
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/SecurityAudit
       Path: "/"

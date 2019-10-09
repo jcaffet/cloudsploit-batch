@@ -291,7 +291,7 @@ Resources:
       FunctionName: !Ref CloudSploitJobLauncherLambda
       Action: "lambda:InvokeFunction"
       Principal: "events.amazonaws.com"
-      SourceArn: !Sub ${CloudSploitScheduledRule.Arn}
+      SourceArn: !GetAtt CloudSploitScheduledRule.Arn
 
   CloudSploitJobLauncherLambdaRole:
     Type: AWS::IAM::Role
@@ -410,7 +410,7 @@ Resources:
           ORGANIZATIONS_ROLE_EXTERNALID: !Ref OrganizationsRoleExternalId
           ORGANIZATIONS_ACCOUNT: !Ref OrganizationsAccount
       MemorySize: 128
-      Role: !Sub ${CloudSploitJobLauncherLambdaRole.Arn}
+      Role: !GetAtt CloudSploitJobLauncherLambdaRole.Arn
       Runtime: "python3.7"
       Timeout: 60
       Tags:
@@ -549,7 +549,7 @@ Resources:
           ORGANIZATION_ROLE_EXTERNALID: !Ref OrganizationsRoleExternalId
           ORGANIZATION_ACCOUNT: !Ref OrganizationsAccount
           STACKSET_NAME: !Ref CloudSploitSpokeStackSet
-          STACKSET_REGION: !Sub "${AWS::Region}"
+          STACKSET_REGION: !Ref AWS::Region
       MemorySize: 128
       Role: !GetAtt CloudSploitAccountHarversterLambdaRole.Arn
       Runtime: "python3.7"
